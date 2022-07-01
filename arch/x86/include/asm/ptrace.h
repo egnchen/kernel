@@ -243,7 +243,7 @@ extern const char *regs_query_register_name(unsigned int offset);
  * offset of the register in struct pt_regs address which specified by @regs.
  * If @offset is bigger than MAX_REG_OFFSET, this returns 0.
  */
-static inline unsigned long regs_get_register(struct pt_regs *regs,
+static inline __attribute__((always_inline)) unsigned long regs_get_register(struct pt_regs *regs,
 					      unsigned int offset)
 {
 	if (unlikely(offset > MAX_REG_OFFSET))
@@ -257,10 +257,40 @@ static inline unsigned long regs_get_register(struct pt_regs *regs,
 	    offset == offsetof(struct pt_regs, fs) ||
 	    offset == offsetof(struct pt_regs, gs)) {
 		return *(u16 *)((unsigned long)regs + offset);
-
 	}
 #endif
 	return *(unsigned long *)((unsigned long)regs + offset);
+}
+
+/**
+ * regs_set_register() - set register value to new value from its offset
+ * @regs:	pt_regs from whitch register value is gotten.
+ * @offset:	offset number of the register.
+ * @val:	new value for the register
+ *
+ * Returns 0 on success. The @offset is the offset of the register
+ * in struct pt_regs address which specified by @regs. If @offset is
+ * bigger than MAX_REG_OFFSET, this returns -1. 
+ */
+static inline int regs_set_register(struct pt_regs *regs,
+							unsigned int offset, unsigned long val)
+{
+	if (unlikely(offset > MAX_REG_OFFSET))
+		return -1;
+#ifdef CONFIG_X86_32
+	/* The selector fields are 16-bit. */
+	if (offset == offsetof(struct pt_regs, cs) ||
+	    offset == offsetof(struct pt_regs, ss) ||
+	    offset == offsetof(struct pt_regs, ds) ||
+	    offset == offsetof(struct pt_regs, es) ||
+	    offset == offsetof(struct pt_regs, fs) ||
+	    offset == offsetof(struct pt_regs, gs)) {
+		*(u16 *)((unsigned long)regs + offset) = (u16)val;
+		return 0;
+	}
+#endif
+	*(unsigned long *)((unsigned long)regs + offset) = val;
+	return 0;
 }
 
 /**
@@ -325,6 +355,23 @@ static inline unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs,
 	return 0;
 }
 
+static const unsigned int argument_offs[] = {
+#ifdef __i386__
+	offsetof(struct pt_regs, ax),
+	offsetof(struct pt_regs, dx),
+	offsetof(struct pt_regs, cx),
+#define NR_REG_ARGUMENTS 3
+#else
+	offsetof(struct pt_regs, di),
+	offsetof(struct pt_regs, si),
+	offsetof(struct pt_regs, dx),
+	offsetof(struct pt_regs, cx),
+	offsetof(struct pt_regs, r8),
+	offsetof(struct pt_regs, r9),
+#define NR_REG_ARGUMENTS 6
+#endif
+};
+
 /**
  * regs_get_kernel_argument() - get Nth function argument in kernel
  * @regs:	pt_regs of that context
@@ -339,28 +386,36 @@ static inline unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs,
 static inline unsigned long regs_get_kernel_argument(struct pt_regs *regs,
 						     unsigned int n)
 {
-	static const unsigned int argument_offs[] = {
-#ifdef __i386__
-		offsetof(struct pt_regs, ax),
-		offsetof(struct pt_regs, dx),
-		offsetof(struct pt_regs, cx),
-#define NR_REG_ARGUMENTS 3
-#else
-		offsetof(struct pt_regs, di),
-		offsetof(struct pt_regs, si),
-		offsetof(struct pt_regs, dx),
-		offsetof(struct pt_regs, cx),
-		offsetof(struct pt_regs, r8),
-		offsetof(struct pt_regs, r9),
-#define NR_REG_ARGUMENTS 6
-#endif
-	};
-
 	if (n >= NR_REG_ARGUMENTS) {
 		n -= NR_REG_ARGUMENTS - 1;
 		return regs_get_kernel_stack_nth(regs, n);
-	} else
+	} else {
 		return regs_get_register(regs, argument_offs[n]);
+	}
+}
+
+/**
+ * regs_set_kernel_argument() - set Nth function argument in kernel
+ * @regs:	pt_regs of that context
+ * @n:		function argument number (start from 0)
+ * @val:	new value for the argument
+ * 
+ * Returns 0 on success, -1 on failure. This function is added for
+ * error injection by function argument modifications in eBPF programs.
+ */
+static inline int regs_set_kernel_argument(struct pt_regs *regs,
+						     unsigned int n, unsigned long val)
+{
+	if (n >= NR_REG_ARGUMENTS) {
+		unsigned long *addr = regs_get_kernel_stack_nth_addr(regs, n);
+		n -= NR_REG_ARGUMENTS - 1;
+		if (addr == NULL)
+			return -1;		
+		*addr = val;
+		return 0;
+	} else {
+		return regs_set_register(regs, argument_offs[n], val);
+	}
 }
 
 #define arch_has_single_step()	(1)

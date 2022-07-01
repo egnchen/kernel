@@ -144,6 +144,34 @@ static const struct bpf_func_proto bpf_override_return_proto = {
 	.arg1_type	= ARG_PTR_TO_CTX,
 	.arg2_type	= ARG_ANYTHING,
 };
+
+BPF_CALL_2(bpf_get_argument, struct pt_regs *, regs, unsigned long, idx)
+{
+	return regs_get_kernel_argument(regs, idx);
+}
+
+static const struct bpf_func_proto bpf_get_argument_proto = {
+	.func		= bpf_get_argument,
+	.gpl_only	= true,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_PTR_TO_CTX,
+	.arg2_type	= ARG_ANYTHING,
+};
+
+BPF_CALL_3(bpf_override_argument, struct pt_regs *, regs, unsigned long, idx, unsigned long, value)
+{
+	return regs_set_kernel_argument(regs, idx, value);
+}
+
+static const struct bpf_func_proto bpf_override_argument_proto = {
+	.func		= bpf_override_argument,
+	.gpl_only	= true,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_PTR_TO_CTX,
+	.arg2_type	= ARG_ANYTHING,
+	.arg3_type 	= ARG_ANYTHING,
+};
+
 #endif
 
 static __always_inline int
@@ -1349,6 +1377,10 @@ kprobe_prog_func_proto(enum bpf_func_id func_id, const struct bpf_prog *prog)
 #ifdef CONFIG_BPF_KPROBE_OVERRIDE
 	case BPF_FUNC_override_return:
 		return &bpf_override_return_proto;
+	case BPF_FUNC_get_argument:
+		return &bpf_get_argument_proto;
+	case BPF_FUNC_override_argument:
+		return &bpf_override_argument_proto;
 #endif
 	default:
 		return bpf_tracing_func_proto(func_id, prog);

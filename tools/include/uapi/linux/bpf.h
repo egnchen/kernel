@@ -1944,6 +1944,28 @@ union bpf_attr {
  * 	Return
  * 		0
  *
+ * long bpf_get_argument(struct pt_regs *regs, int idx)
+ * 	Description
+ * 		Get the #idx argument of a function call. This is a helper function
+ * 		in the error injection module. This function is provided to bypass
+ * 		eBPF verifier's "ctx+const+const" nonsense.
+ * 	Return
+ * 		value of the register on sucess, 0 on failure
+ *
+ * long bpf_override_argument(struct pt_regs *regs, int idx, u64 val)
+ * 	Description
+ * 		Used for error injection, uses kprobes to override specified argument
+ * 		of the probed function, set it to *val*. An *idx* of 0 means the
+ * 		first argument is set to *val*. After the modification the function
+ * 		is called with modified arguments.
+ * 
+ * 		This function is subject to the same restrictions as
+ * 		**bpf_override_return**. Note that an idx too large can lead to
+ * 		unwanted kernel stack override(since arguments can be stored onto
+ * 		the stack on most architectures), so use with extreme care.
+ * 	Return
+ * 		0 on success, -1 on failure(if offset is invalid)
+ *
  * long bpf_sock_ops_cb_flags_set(struct bpf_sock_ops *bpf_sock, int argval)
  * 	Description
  * 		Attempt to set the value of the **bpf_sock_ops_cb_flags** field
@@ -3803,6 +3825,8 @@ union bpf_attr {
 	FN(perf_prog_read_value),	\
 	FN(getsockopt),			\
 	FN(override_return),		\
+	FN(get_argument),		\
+	FN(override_argument),		\
 	FN(sock_ops_cb_flags_set),	\
 	FN(msg_redirect_map),		\
 	FN(msg_apply_bytes),		\

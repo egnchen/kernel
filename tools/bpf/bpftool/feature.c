@@ -358,7 +358,7 @@ static void probe_kernel_image_config(const char *define_prefix)
 		{ "CONFIG_FTRACE_SYSCALLS", },
 		/* bpf_override_return() helper support for selected arch */
 		{ "CONFIG_FUNCTION_ERROR_INJECTION", },
-		/* bpf_override_return() helper */
+		/* bpf_override_return() & bpf_override_argument helpers */
 		{ "CONFIG_BPF_KPROBE_OVERRIDE", },
 
 		/* Network */

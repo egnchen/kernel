@@ -18,7 +18,7 @@
 struct {
 	__uint(type, BPF_MAP_TYPE_PROG_ARRAY);
 	__uint(key_size, sizeof(u32));
-	__uint(value_size, sizeof(u32));
+	__uint(value_size, sizeof(u64) + 6 * sizeof(u64));
 #ifdef __mips__
 	__uint(max_entries, 6000); /* MIPS n64 syscalls start at 5000 */
 #else
